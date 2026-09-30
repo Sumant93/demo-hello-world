@@ -1,0 +1,87 @@
+name: CI-CD
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+jobs:
+
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - run: npm test
+
+  sbom:
+
+    needs: test
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: "*.spdx.json"
+
+  deploy-dev:
+
+    needs:
+      - test
+      - sbom
+
+    if: github.event_name == 'push'
+
+    runs-on: ubuntu-latest
+
+    environment: dev
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Publish DEV
+        run: |
+          mkdir output
+          cp index.html output/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+  deploy-prod:
+
+    needs: deploy-dev
+
+    runs-on: ubuntu-latest
+
+    environment: prod
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Deploy PROD
+        run: |
+          echo "Deploying to Production"
